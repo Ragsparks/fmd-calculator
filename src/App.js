@@ -39,6 +39,7 @@ const InputField = ({ label, value, onChange, type = 'text', placeholder = '', e
         onChange={handleChange} // Usar el nuevo manejador de cambio
         placeholder={placeholder}
       />
+      {/* Asegúrate de que 'error' siempre sea una cadena o null/undefined */}
       {error && <p className="text-red-500 text-xs italic mt-1">{error}</p>}
     </div>
   );
@@ -114,7 +115,7 @@ const App = () => {
         newObjectErrors[fieldName.split(' ')[1]] = errorMsg; // Extrae el número de carro
         return { isValid: !errorMsg, newErrors: newObjectErrors };
     } else { // Para campos individuales
-      return { isValid: !errorMsg, newErrors: errorMsg };
+      return { isValid: !errorMsg, newErrors: errorMsg }; // Devolvemos la cadena de error directamente
     }
   };
 
@@ -123,20 +124,19 @@ const App = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Validación en tiempo real (opcional, se puede hacer solo al calcular)
     if (field === 'passengers') {
+      // Aquí, usa .newErrors para obtener la cadena de error
       setFormErrors(prev => ({ ...prev, passengers: validateNumberInput(value, 'Total Passengers', prev.passengers).newErrors }));
-      // También limpiar el error de comidas especiales vs pasajeros si los pasajeros cambian
       setFormErrors(prev => ({ ...prev, specialMealsVsPassengers: '' }));
     }
     if (field === 'totalSpecialMeals') {
+      // Aquí, usa .newErrors para obtener la cadena de error
       setFormErrors(prev => ({ ...prev, totalSpecialMeals: validateNumberInput(value, 'Total Special Meals', prev.totalSpecialMeals).newErrors }));
-      // También limpiar el error de comidas especiales vs pasajeros si las especiales cambian
       setFormErrors(prev => ({ ...prev, specialMealsVsPassengers: '' }));
-      // Y el error de suma de especiales por carro
       setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
     }
     if (field === 'numCarts') {
+      // Aquí, usa .newErrors para obtener la cadena de error
       setFormErrors(prev => ({ ...prev, numCarts: validateNumberInput(value, 'Number of Carts', prev.numCarts).newErrors }));
-      // Y el error de suma de especiales por carro
       setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
     }
   };
@@ -152,7 +152,7 @@ const App = () => {
     newQuantities[index] = value;
     setFormData(prev => ({ ...prev, optionQuantities: newQuantities }));
 
-    const { newErrors } = validateNumberInput(value, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, formErrors.optionQuantities, index); // Eliminado el uso de isValid
+    const { newErrors } = validateNumberInput(value, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, formErrors.optionQuantities, index);
     setFormErrors(prev => ({ ...prev, optionQuantities: newErrors }));
   };
 
@@ -307,17 +307,16 @@ const App = () => {
     const currentErrors = { ...formErrors }; // Copia para acumular errores
 
     // Validar campos individuales
-    // Actualizar el estado de errores directamente con el resultado de validateNumberInput
     const validateAndUpdateError = (value, fieldName, errorKey, label) => {
         const { isValid: fieldIsValid, newErrors } = validateNumberInput(value, label, currentErrors[errorKey]);
-        currentErrors[errorKey] = newErrors;
+        currentErrors[errorKey] = newErrors; // newErrors aquí ya es la cadena de error
         if (!fieldIsValid) hasErrors = true;
         return fieldIsValid;
     };
 
     validateAndUpdateError(formData.passengers, 'Total Passengers', 'passengers', 'Total Passengers');
     validateAndUpdateError(formData.totalSpecialMeals, 'Total Special Meals', 'totalSpecialMeals', 'Total Special Meals');
-    validateAndUpdateError(formData.numCarts, 'Number of Carts', 'numCarts', 'Number of Carts'); // This now includes MAX_NUMBER_OF_CARTS check
+    validateAndUpdateError(formData.numCarts, 'Number of Carts', 'numCarts', 'Number of Carts');
 
     // Validar cantidades de opciones generales
     const newOptionQuantitiesErrors = [...currentErrors.optionQuantities];
