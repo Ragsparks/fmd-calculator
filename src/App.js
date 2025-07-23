@@ -152,7 +152,7 @@ const App = () => {
     newQuantities[index] = value;
     setFormData(prev => ({ ...prev, optionQuantities: newQuantities }));
 
-    const { isValid, newErrors } = validateNumberInput(value, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, formErrors.optionQuantities, index);
+    const { isValid: _, newErrors } = validateNumberInput(value, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, formErrors.optionQuantities, index); // Eliminado el uso de isValid
     setFormErrors(prev => ({ ...prev, optionQuantities: newErrors }));
   };
 
@@ -165,7 +165,7 @@ const App = () => {
       }
     }));
 
-    const { isValid, newErrors } = validateNumberInput(value, `Cart ${cartNumber} Special Meals`, formErrors.specialMealsPerCart, null); // index is null for object
+    const { isValid: _, newErrors } = validateNumberInput(value, `Cart ${cartNumber} Special Meals`, formErrors.specialMealsPerCart, null); // Eliminado el uso de isValid
     setFormErrors(prev => ({ ...prev, specialMealsPerCart: newErrors }));
     // Limpiar el error de suma de especiales por carro
     setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
@@ -309,10 +309,10 @@ const App = () => {
     // Validar campos individuales
     // Actualizar el estado de errores directamente con el resultado de validateNumberInput
     const validateAndUpdateError = (value, fieldName, errorKey, label) => {
-        const { isValid, newErrors } = validateNumberInput(value, label, currentErrors[errorKey]);
+        const { isValid: fieldIsValid, newErrors } = validateNumberInput(value, label, currentErrors[errorKey]); // Eliminado el uso de isValid
         currentErrors[errorKey] = newErrors;
-        if (!isValid) hasErrors = true;
-        return isValid;
+        if (!fieldIsValid) hasErrors = true;
+        return fieldIsValid;
     };
 
     validateAndUpdateError(formData.passengers, 'Total Passengers', 'passengers', 'Total Passengers');
@@ -322,8 +322,8 @@ const App = () => {
     // Validar cantidades de opciones generales
     const newOptionQuantitiesErrors = [...currentErrors.optionQuantities];
     formData.optionQuantities.forEach((qty, index) => {
-        const { isValid, newErrors } = validateNumberInput(qty, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, currentErrors.optionQuantities, index);
-        if (!isValid) {
+        const { isValid: fieldIsValid, newErrors } = validateNumberInput(qty, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, currentErrors.optionQuantities, index);
+        if (!fieldIsValid) {
             newOptionQuantitiesErrors[index] = newErrors[index];
             hasErrors = true;
         } else {
@@ -335,8 +335,8 @@ const App = () => {
     // Validar comidas especiales por carro
     const newSpecialMealsPerCartErrors = { ...currentErrors.specialMealsPerCart };
     for (const cartNum in formData.specialMealsPerCartInput) {
-        const { isValid, newErrors } = validateNumberInput(formData.specialMealsPerCartInput[cartNum], `Cart ${cartNum} Special Meals`, currentErrors.specialMealsPerCart, null);
-        if (!isValid) {
+        const { isValid: fieldIsValid, newErrors } = validateNumberInput(formData.specialMealsPerCartInput[cartNum], `Cart ${cartNum} Special Meals`, currentErrors.specialMealsPerCart, null);
+        if (!fieldIsValid) {
             newSpecialMealsPerCartErrors[cartNum] = newErrors[cartNum];
             hasErrors = true;
         } else {
@@ -405,7 +405,7 @@ const App = () => {
       });
     }
 
-  }, [formData, formErrors, _calculateAuxiliaryValues, _distributeMealsPerCart, _calculateExcesses]); // Dependencias del useCallback
+  }, [formData, formErrors, _calculateAuxiliaryValues, _distributeMealsPerCart, _calculateExcesses, showMessage]); // AÑADIDO showMessage como dependencia
 
   // Función para copiar los resultados al portapapeles
   const handleCopyResults = () => {
