@@ -77,16 +77,16 @@ const App = () => {
   const [messageBox, setMessageBox] = useState({ show: false, type: '', message: '' });
   const [copyMessage, setCopyMessage] = useState('');
 
-  // Muestra un mensaje temporal en la caja de mensajes
-  const showMessage = (type, message) => {
+  // Muestra un mensaje temporal en la caja de mensajes (Ahora envuelto en useCallback)
+  const showMessage = useCallback((type, message) => {
     setMessageBox({ show: true, type, message });
-    setTimeout(() => hideMessage(), 5000);
-  };
+    setTimeout(() => setMessageBox({ show: false, type: '', message: '' }), 5000); // Usar setMessageBox directamente
+  }, []); // Dependencias vacías para que la función sea estable
 
-  // Oculta la caja de mensajes
-  const hideMessage = () => {
+  // Oculta la caja de mensajes (Ahora envuelto en useCallback)
+  const hideMessage = useCallback(() => {
     setMessageBox({ show: false, type: '', message: '' });
-  };
+  }, []); // Dependencias vacías para que la función sea estable
 
   // --- LÓGICA DE VALIDACIÓN CENTRALIZADA ---
   const validateNumberInput = (value, fieldName, currentErrors, index = null) => {
@@ -152,7 +152,7 @@ const App = () => {
     newQuantities[index] = value;
     setFormData(prev => ({ ...prev, optionQuantities: newQuantities }));
 
-    const { isValid: _, newErrors } = validateNumberInput(value, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, formErrors.optionQuantities, index); // Eliminado el uso de isValid
+    const { newErrors } = validateNumberInput(value, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, formErrors.optionQuantities, index); // Eliminado el uso de isValid
     setFormErrors(prev => ({ ...prev, optionQuantities: newErrors }));
   };
 
@@ -165,7 +165,7 @@ const App = () => {
       }
     }));
 
-    const { isValid: _, newErrors } = validateNumberInput(value, `Cart ${cartNumber} Special Meals`, formErrors.specialMealsPerCart, null); // Eliminado el uso de isValid
+    const { newErrors } = validateNumberInput(value, `Cart ${cartNumber} Special Meals`, formErrors.specialMealsPerCart, null); // Eliminado el uso de isValid
     setFormErrors(prev => ({ ...prev, specialMealsPerCart: newErrors }));
     // Limpiar el error de suma de especiales por carro
     setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
@@ -309,7 +309,7 @@ const App = () => {
     // Validar campos individuales
     // Actualizar el estado de errores directamente con el resultado de validateNumberInput
     const validateAndUpdateError = (value, fieldName, errorKey, label) => {
-        const { isValid: fieldIsValid, newErrors } = validateNumberInput(value, label, currentErrors[errorKey]); // Eliminado el uso de isValid
+        const { isValid: fieldIsValid, newErrors } = validateNumberInput(value, label, currentErrors[errorKey]);
         currentErrors[errorKey] = newErrors;
         if (!fieldIsValid) hasErrors = true;
         return fieldIsValid;
@@ -405,7 +405,7 @@ const App = () => {
       });
     }
 
-  }, [formData, formErrors, _calculateAuxiliaryValues, _distributeMealsPerCart, _calculateExcesses, showMessage]); // AÑADIDO showMessage como dependencia
+  }, [formData, formErrors, _calculateAuxiliaryValues, _distributeMealsPerCart, _calculateExcesses, showMessage]);
 
   // Función para copiar los resultados al portapapeles
   const handleCopyResults = () => {
