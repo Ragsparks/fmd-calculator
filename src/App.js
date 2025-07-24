@@ -208,17 +208,12 @@ const App = () => {
       percentOption2: totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[1]) / totalGeneralMealsAvailable,
       percentOption3: N(params.numGeneralOptions) === 3 ? (totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[2]) / totalGeneralMealsAvailable) : 0,
     };
-  }, [formData.numCarts, formData.numGeneralOptions, formData.optionQuantities]); // Mantenidas: estas son dependencias válidas del estado formData
+  }, [formData.numCarts, formData.numGeneralOptions, formData.optionQuantities]); // Añadidas dependencias
 
   // Realiza la distribución de comidas por carro
   const _distributeMealsPerCart = useCallback((params, auxValues) => {
     const results = [];
     const assigned = { special: [], option1: [], option2: [], option3: [] };
-
-    // Si no hay carros, no hay distribución posible, pero se debe retornar la estructura esperada
-    if (N(params.numCarts) === 0) {
-      return { results, assigned }; // Retorna arrays vacíos si no hay carros
-    }
 
     for (let i = 1; i <= N(params.numCarts); i++) {
       const cartName = `Cart ${i}`;
@@ -275,8 +270,8 @@ const App = () => {
       assigned.option2.push(option2Assigned);
       assigned.option3.push(option3Assigned);
     }
-    return { results, assigned }; // Asegura que siempre se retorne el objeto
-  }, [formData.numCarts, formData.numGeneralOptions, formData.specialMealsPerCartInput]); 
+    return { results, assigned };
+  }, [formData.numCarts, formData.numGeneralOptions, formData.specialMealsPerCartInput, MAX_CART_CAPACITY]); // Añadidas dependencias
 
   // Calcula los excedentes
   const _calculateExcesses = useCallback((params, assignedMeals, optionNames) => {
@@ -293,8 +288,8 @@ const App = () => {
     if (N(params.numGeneralOptions) === 3) {
       results.push({ type: optionNames[2], quantity: N(params.optionQuantities[2]) - sumAssignedOption3 });
     }
-    // Mantenidas: estas son dependencias válidas del estado formData
-  }, [formData.numGeneralOptions, formData.optionQuantities, formData.totalSpecialMeals]); 
+    return results;
+  }, [formData.numGeneralOptions, formData.optionQuantities, formData.totalSpecialMeals]); // Añadidas dependencias
 
   // --- FUNCIÓN PRINCIPAL DE CÁLCULO ---
   const calculateDistribution = useCallback(() => {
@@ -501,7 +496,8 @@ const App = () => {
     setExcessResults(newExcessResults); // Actualizar los excedentes restantes
     showMessage('success', 'Excess general meals redistributed!');
 
-  }, [distributionResults, excessResults, formData.optionNames, getOptionKey, showMessage, formData.numCarts]); // Añadida formData.numCarts
+  }, [distributionResults, excessResults, formData.optionNames, getOptionKey, showMessage]);
+
 
   // Función para copiar los resultados al portapapeles
   const handleCopyResults = () => {
@@ -571,7 +567,7 @@ const App = () => {
     if (showExcessNotes) { // Solo copiar si las notas están actualmente visibles
         copyText += "--- Notes on Excess Meals ---\n";
         copyText += `The excess meals indicated above should be distributed among the different carts if their individual capacity (maximum ${MAX_CART_CAPACITY} units) still allows it.\n`;
-        copyText += "If the carts have already reached their maximum capacity or there is not enough space, these meals must be managed **manually** or assigned to an **auxiliary cart** if the operation requires it.\n\n";
+        copyText += "If the carts have already reached their maximum capacity or there is not enough space, these meals must be managed manually or assigned to an auxiliary cart if the operation requires it.\n\n";
     }
 
 
