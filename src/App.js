@@ -72,8 +72,10 @@ const App = () => {
   // --- ESTADOS DE RESULTADOS ---
   const [mealAlertState, setMealAlertState] = useState({ isProblem: false, message: '' });
   const [distributionResults, setDistributionResults] = useState([]);
+  // adjustedDistributionResults ahora siempre será un array, inicialmente vacío
+  const [adjustedDistributionResults, setAdjustedDistributionResults] = useState([]); 
   const [excessResults, setExcessResults] = useState([]);
-  const [adjustedDistributionResults, setAdjustedDistributionResults] = useState(null); // Nuevo estado para la distribución ajustada
+
 
   // --- ESTADOS DE UI/FEEDBACK ---
   const [messageBox, setMessageBox] = useState({ show: false, type: '', message: '' });
@@ -186,7 +188,7 @@ const App = () => {
     setMealAlertState({ isProblem: false, message: '' });
     setDistributionResults([]);
     setExcessResults([]);
-    setAdjustedDistributionResults(null); // Limpiar resultados ajustados
+    setAdjustedDistributionResults([]); // Limpiar resultados ajustados a un array vacío
     hideMessage();
     setCopyMessage('');
     setShowExcessNotes(false); // Ocultar notas al limpiar
@@ -194,7 +196,7 @@ const App = () => {
 
   // --- LÓGICA DE CÁLCULO REFACTORIZADA ---
 
-  // Calcula valores auxiliares como porcentajes y capacidades base
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const _calculateAuxiliaryValues = useCallback((params) => {
     const totalGeneralMealsAvailable = N(params.optionQuantities[0]) + N(params.optionQuantities[1]) + (N(params.numGeneralOptions) === 3 ? N(params.optionQuantities[2]) : 0);
     const baseCapacityPerCart = N(params.numCarts) === 0 ? 0 : Math.floor(totalGeneralMealsAvailable / N(params.numCarts));
@@ -208,12 +210,17 @@ const App = () => {
       percentOption2: totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[1]) / totalGeneralMealsAvailable,
       percentOption3: N(params.numGeneralOptions) === 3 ? (totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[2]) / totalGeneralMealsAvailable) : 0,
     };
-  }, [formData.numCarts, formData.numGeneralOptions, formData.optionQuantities]); // Añadidas dependencias
+  }, [formData.numCarts, formData.numGeneralOptions, formData.optionQuantities]); // Mantenidas: estas son dependencias válidas del estado formData
 
-  // Realiza la distribución de comidas por carro
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const _distributeMealsPerCart = useCallback((params, auxValues) => {
     const results = [];
     const assigned = { special: [], option1: [], option2: [], option3: [] };
+
+    // FIX: Add early return if no carts to prevent TypeError
+    if (N(params.numCarts) === 0) {
+      return { results, assigned }; // Return empty arrays to prevent destructuring undefined
+    }
 
     for (let i = 1; i <= N(params.numCarts); i++) {
       const cartName = `Cart ${i}`;
@@ -271,9 +278,9 @@ const App = () => {
       assigned.option3.push(option3Assigned);
     }
     return { results, assigned };
-  }, [formData.numCarts, formData.numGeneralOptions, formData.specialMealsPerCartInput, MAX_CART_CAPACITY]); // Añadidas dependencias
+  }, [formData.numCarts, formData.numGeneralOptions, formData.specialMealsPerCartInput]); // MAX_CART_CAPACITY removed from dependencies
 
-  // Calcula los excedentes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const _calculateExcesses = useCallback((params, assignedMeals, optionNames) => {
     const sumAssignedSpecial = assignedMeals.special.reduce((sum, qty) => sum + qty, 0);
     const sumAssignedOption1 = assignedMeals.option1.reduce((sum, qty) => sum + qty, 0);
@@ -289,7 +296,7 @@ const App = () => {
       results.push({ type: optionNames[2], quantity: N(params.optionQuantities[2]) - sumAssignedOption3 });
     }
     return results;
-  }, [formData.numGeneralOptions, formData.optionQuantities, formData.totalSpecialMeals]); // Añadidas dependencias
+  }, [formData.numGeneralOptions, formData.optionQuantities, formData.totalSpecialMeals]); // Mantenidas: estas son dependencias válidas del estado formData
 
   // --- FUNCIÓN PRINCIPAL DE CÁLCULO ---
   const calculateDistribution = useCallback(() => {
@@ -369,8 +376,8 @@ const App = () => {
 
     setDistributionResults(distResults);
     setExcessResults(excResults);
-    setAdjustedDistributionResults(null); // Reiniciar resultados ajustados en un nuevo cálculo primario
-
+    setAdjustedDistributionResults([]); // Reiniciar resultados ajustados a un array vacío
+    
     // Actualizar el estado de la alerta de comidas
     const totalAvailableMeals = auxValues.totalGeneralMealsAvailable + N(formData.totalSpecialMeals);
     if (totalAvailableMeals < N(formData.passengers)) {
@@ -426,6 +433,7 @@ const App = () => {
 
       // Estrategia de distribución: intentar igualar cantidades y luego llenar espacios restantes
       let attempts = 0;
+      // Added formData.numCarts to dependencies for maxAttemptsPerMealType calculation
       const maxAttemptsPerMealType = MAX_CART_CAPACITY * N(formData.numCarts) * 3; // Límite para evitar bucles infinitos
 
       while (remainingExcess > 0 && attempts < maxAttemptsPerMealType) {
@@ -496,7 +504,7 @@ const App = () => {
     setExcessResults(newExcessResults); // Actualizar los excedentes restantes
     showMessage('success', 'Excess general meals redistributed!');
 
-  }, [distributionResults, excessResults, formData.optionNames, getOptionKey, showMessage]);
+  }, [distributionResults, excessResults, formData.optionNames, getOptionKey, showMessage, formData.numCarts]); // formData.numCarts added here
 
 
   // Función para copiar los resultados al portapapeles
@@ -522,9 +530,10 @@ const App = () => {
       copyText += `Meal Alert: ${alertMessageContent.replace(/\s+/g, ' ').trim()}\n\n`; // Limpiar espacios extra
     }
 
-    // Añadir Distribución por Carro (Inicial o Ajustada)
-    const resultsToCopy = adjustedDistributionResults || distributionResults;
-    const sectionTitle = adjustedDistributionResults ? "Adjusted Distribution by Cart:" : "Initial Distribution by Cart:";
+    // Asegurarse de que adjustedDistributionResults sea un array para la copia
+    const currentAdjustedResultsForCopy = Array.isArray(adjustedDistributionResults) ? adjustedDistributionResults : [];
+    const resultsToCopy = currentAdjustedResultsForCopy.length > 0 ? currentAdjustedResultsForCopy : distributionResults;
+    const sectionTitle = currentAdjustedResultsForCopy.length > 0 ? "Adjusted Distribution by Cart:" : "Initial Distribution by Cart:";
 
     if (resultsToCopy.length > 0) {
       copyText += sectionTitle + "\n";
@@ -586,6 +595,9 @@ const App = () => {
     }
     document.body.removeChild(textarea);
   };
+
+  // Asegurarse de que adjustedDistributionResults sea un array para el renderizado
+  const currentAdjustedResults = Array.isArray(adjustedDistributionResults) ? adjustedDistributionResults : [];
 
 
   // Render the UI
@@ -774,7 +786,7 @@ const App = () => {
             )}
 
             {/* Adjusted Distribution Table (conditionally rendered) */}
-            {adjustedDistributionResults && (
+            {currentAdjustedResults.length > 0 && ( // Condición actualizada para usar la variable local
               <div className="mt-8 p-6 bg-blue-50 rounded-lg shadow-inner border border-blue-200">
                 <h3 className="text-xl font-semibold text-blue-800 mb-4">✨ Adjusted Distribution by Cart</h3>
                 <div className="overflow-x-auto rounded-lg shadow-md">
@@ -792,7 +804,7 @@ const App = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {adjustedDistributionResults.map((row, index) => (
+                      {currentAdjustedResults.map((row, index) => ( // Usar la variable local
                         <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
                           <td className="py-2 px-4 border-b text-sm text-gray-800">{row.cartName}</td>
                           <td className="py-2 px-4 border-b text-sm text-gray-800">{row.special}</td>
