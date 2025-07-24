@@ -90,6 +90,7 @@ const App = () => {
   }, []); // Dependencias vacías para que la función sea estable
 
   // --- LÓGICA DE VALIDACIÓN CENTRALIZADA ---
+  // Ahora validateNumberInput devuelve una cadena para campos individuales, y un objeto para arrays/objetos.
   const validateNumberInput = (value, fieldName, currentErrors, index = null) => {
     const num = Number(value);
     let errorMsg = '';
@@ -105,17 +106,17 @@ const App = () => {
       errorMsg = `Total passengers cannot exceed ${MAX_PASSENGERS}.`;
     }
 
-    // Actualiza el estado de errores de forma inmutable
+    // Determine return structure based on field type
     if (index !== null) { // Para arrays como optionQuantities
       const newArrayErrors = [...currentErrors];
       newArrayErrors[index] = errorMsg;
-      return { isValid: !errorMsg, newErrors: newArrayErrors };
-    } else if (fieldName.includes('Cart')) { // Para objetos como specialMealsPerCart
+      return { isValid: !errorMsg, newErrors: newArrayErrors }; // Returns an object
+    } else if (fieldName.includes('Cart')) { // Para objetos como specialMealsPerCartInput
         const newObjectErrors = { ...currentErrors };
-        newObjectErrors[fieldName.split(' ')[1]] = errorMsg; // Extrae el número de carro
-        return { isValid: !errorMsg, newErrors: newObjectErrors };
-    } else { // Para campos individuales
-      return { isValid: !errorMsg, newErrors: errorMsg }; // Devolvemos la cadena de error directamente
+        newObjectErrors[fieldName.split(' ')[1]] = errorMsg;
+        return { isValid: !errorMsg, newErrors: newObjectErrors }; // Returns an object
+    } else { // Para campos individuales (passengers, totalSpecialMeals, numCarts)
+      return errorMsg; // Directly return the error string
     }
   };
 
@@ -124,19 +125,19 @@ const App = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Validación en tiempo real (opcional, se puede hacer solo al calcular)
     if (field === 'passengers') {
-      // Aquí, usa .newErrors para obtener la cadena de error
-      setFormErrors(prev => ({ ...prev, passengers: validateNumberInput(value, 'Total Passengers', prev.passengers).newErrors }));
+      // Directamente asigna la cadena de error devuelta
+      setFormErrors(prev => ({ ...prev, passengers: validateNumberInput(value, 'Total Passengers', prev.passengers) }));
       setFormErrors(prev => ({ ...prev, specialMealsVsPassengers: '' }));
     }
     if (field === 'totalSpecialMeals') {
-      // Aquí, usa .newErrors para obtener la cadena de error
-      setFormErrors(prev => ({ ...prev, totalSpecialMeals: validateNumberInput(value, 'Total Special Meals', prev.totalSpecialMeals).newErrors }));
+      // Directamente asigna la cadena de error devuelta
+      setFormErrors(prev => ({ ...prev, totalSpecialMeals: validateNumberInput(value, 'Total Special Meals', prev.totalSpecialMeals) }));
       setFormErrors(prev => ({ ...prev, specialMealsVsPassengers: '' }));
       setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
     }
     if (field === 'numCarts') {
-      // Aquí, usa .newErrors para obtener la cadena de error
-      setFormErrors(prev => ({ ...prev, numCarts: validateNumberInput(value, 'Number of Carts', prev.numCarts).newErrors }));
+      // Directamente asigna la cadena de error devuelta
+      setFormErrors(prev => ({ ...prev, numCarts: validateNumberInput(value, 'Number of Carts', prev.numCarts) }));
       setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
     }
   };
@@ -308,10 +309,11 @@ const App = () => {
 
     // Validar campos individuales
     const validateAndUpdateError = (value, fieldName, errorKey, label) => {
-        const { isValid: fieldIsValid, newErrors } = validateNumberInput(value, label, currentErrors[errorKey]);
-        currentErrors[errorKey] = newErrors; // newErrors aquí ya es la cadena de error
-        if (!fieldIsValid) hasErrors = true;
-        return fieldIsValid;
+        // validateNumberInput ahora devuelve directamente la cadena de error para campos individuales
+        const errorString = validateNumberInput(value, label, currentErrors[errorKey]);
+        currentErrors[errorKey] = errorString; // Asigna la cadena de error
+        if (errorString !== '') hasErrors = true; // Si hay una cadena de error, hay errores
+        return errorString === ''; // Retorna true si no hay error (es válido)
     };
 
     validateAndUpdateError(formData.passengers, 'Total Passengers', 'passengers', 'Total Passengers');
@@ -321,6 +323,7 @@ const App = () => {
     // Validar cantidades de opciones generales
     const newOptionQuantitiesErrors = [...currentErrors.optionQuantities];
     formData.optionQuantities.forEach((qty, index) => {
+        // Para arrays, validateNumberInput aún devuelve un objeto { isValid, newErrors }
         const { isValid: fieldIsValid, newErrors } = validateNumberInput(qty, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, currentErrors.optionQuantities, index);
         if (!fieldIsValid) {
             newOptionQuantitiesErrors[index] = newErrors[index];
@@ -334,6 +337,7 @@ const App = () => {
     // Validar comidas especiales por carro
     const newSpecialMealsPerCartErrors = { ...currentErrors.specialMealsPerCart };
     for (const cartNum in formData.specialMealsPerCartInput) {
+        // Para objetos, validateNumberInput aún devuelve un objeto { isValid, newErrors }
         const { isValid: fieldIsValid, newErrors } = validateNumberInput(formData.specialMealsPerCartInput[cartNum], `Cart ${cartNum} Special Meals`, currentErrors.specialMealsPerCart, null);
         if (!fieldIsValid) {
             newSpecialMealsPerCartErrors[cartNum] = newErrors[cartNum];
