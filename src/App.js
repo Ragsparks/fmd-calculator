@@ -215,6 +215,11 @@ const App = () => {
     const results = [];
     const assigned = { special: [], option1: [], option2: [], option3: [] };
 
+    // Si no hay carros, no hay distribución posible, pero se debe retornar la estructura esperada
+    if (N(params.numCarts) === 0) {
+      return { results, assigned }; // Retorna arrays vacíos si no hay carros
+    }
+
     for (let i = 1; i <= N(params.numCarts); i++) {
       const cartName = `Cart ${i}`;
       const specialMealsForThisCart = N(params.specialMealsPerCartInput[i]);
@@ -270,7 +275,7 @@ const App = () => {
       assigned.option2.push(option2Assigned);
       assigned.option3.push(option3Assigned);
     }
-    // Eliminada MAX_CART_CAPACITY de las dependencias, ya que es una constante global
+    return { results, assigned }; // Asegura que siempre se retorne el objeto
   }, [formData.numCarts, formData.numGeneralOptions, formData.specialMealsPerCartInput]); 
 
   // Calcula los excedentes
@@ -566,7 +571,7 @@ const App = () => {
     if (showExcessNotes) { // Solo copiar si las notas están actualmente visibles
         copyText += "--- Notes on Excess Meals ---\n";
         copyText += `The excess meals indicated above should be distributed among the different carts if their individual capacity (maximum ${MAX_CART_CAPACITY} units) still allows it.\n`;
-        copyText += "If the carts have already reached their maximum capacity or there is not enough space, these meals must be managed manually or assigned to an auxiliary cart if the operation requires it.\n\n";
+        copyText += "If the carts have already reached their maximum capacity or there is not enough space, these meals must be managed **manually** or assigned to an **auxiliary cart** if the operation requires it.\n\n";
     }
 
 
