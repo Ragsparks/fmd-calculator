@@ -90,7 +90,7 @@ const App = () => {
   }, []); // Dependencias vacías para que la función sea estable
 
   // --- LÓGICA DE VALIDACIÓN CENTRALIZADA ---
-  // Ahora validateNumberInput devuelve una cadena para campos individuales, y un objeto para arrays/objetos.
+  // validateNumberInput ahora SIEMPRE devuelve un objeto { isValid, newErrors }
   const validateNumberInput = (value, fieldName, currentErrors, index = null) => {
     const num = Number(value);
     let errorMsg = '';
@@ -106,38 +106,38 @@ const App = () => {
       errorMsg = `Total passengers cannot exceed ${MAX_PASSENGERS}.`;
     }
 
-    // Determine return structure based on field type
+    // Todos los caminos de retorno ahora devuelven un objeto { isValid, newErrors }
     if (index !== null) { // Para arrays como optionQuantities
       const newArrayErrors = [...currentErrors];
       newArrayErrors[index] = errorMsg;
-      return { isValid: !errorMsg, newErrors: newArrayErrors }; // Returns an object
+      return { isValid: !errorMsg, newErrors: newArrayErrors }; // Devuelve un objeto
     } else if (fieldName.startsWith('Cart ') && !isNaN(parseInt(fieldName.split(' ')[1]))) { // Para números de carro específicos como "Cart 1", "Cart 2"
         const newObjectErrors = { ...currentErrors };
         newObjectErrors[fieldName.split(' ')[1]] = errorMsg;
-        return { isValid: !errorMsg, newErrors: newObjectErrors }; // Returns an object
+        return { isValid: !errorMsg, newErrors: newObjectErrors }; // Devuelve un objeto
     } else { // Para campos individuales: passengers, totalSpecialMeals, numCarts
-      return errorMsg; // Directly return the error string
+      return { isValid: !errorMsg, newErrors: errorMsg }; // Devuelve un objeto consistentemente
     }
   };
 
   // --- HANDLERS DE CAMBIOS DE INPUTS ---
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Validación en tiempo real (opcional, se puede hacer solo al calcular)
+    // Validación en tiempo real
     if (field === 'passengers') {
-      // Directamente asigna la cadena de error devuelta
-      setFormErrors(prev => ({ ...prev, passengers: validateNumberInput(value, 'Total Passengers', prev.passengers) }));
+      const { newErrors } = validateNumberInput(value, 'Total Passengers', formErrors.passengers); // Desestructura para obtener newErrors
+      setFormErrors(prev => ({ ...prev, passengers: newErrors }));
       setFormErrors(prev => ({ ...prev, specialMealsVsPassengers: '' }));
     }
     if (field === 'totalSpecialMeals') {
-      // Directamente asigna la cadena de error devuelta
-      setFormErrors(prev => ({ ...prev, totalSpecialMeals: validateNumberInput(value, 'Total Special Meals', prev.totalSpecialMeals) }));
+      const { newErrors } = validateNumberInput(value, 'Total Special Meals', formErrors.totalSpecialMeals); // Desestructura para obtener newErrors
+      setFormErrors(prev => ({ ...prev, totalSpecialMeals: newErrors }));
       setFormErrors(prev => ({ ...prev, specialMealsVsPassengers: '' }));
       setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
     }
     if (field === 'numCarts') {
-      // Directamente asigna la cadena de error devuelta
-      setFormErrors(prev => ({ ...prev, numCarts: validateNumberInput(value, 'Number of Carts', prev.numCarts) }));
+      const { newErrors } = validateNumberInput(value, 'Number of Carts', formErrors.numCarts); // Desestructura para obtener newErrors
+      setFormErrors(prev => ({ ...prev, numCarts: newErrors }));
       setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
     }
   };
@@ -149,10 +149,6 @@ const App = () => {
   };
 
   const handleOptionQuantityChange = (index, value) => {
-    const newQuantities = [...formData.optionQuantities];
-    newQuantities[index] = value;
-    setFormData(prev => ({ ...prev, optionQuantities: newQuantities }));
-
     const { newErrors } = validateNumberInput(value, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, formErrors.optionQuantities, index);
     setFormErrors(prev => ({ ...prev, optionQuantities: newErrors }));
   };
@@ -166,7 +162,7 @@ const App = () => {
       }
     }));
 
-    const { newErrors } = validateNumberInput(value, `Cart ${cartNumber} Special Meals`, formErrors.specialMealsPerCart, null); // Eliminado el uso de isValid
+    const { newErrors } = validateNumberInput(value, `Cart ${cartNumber} Special Meals`, formErrors.specialMealsPerCart, null);
     setFormErrors(prev => ({ ...prev, specialMealsPerCart: newErrors }));
     // Limpiar el error de suma de especiales por carro
     setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
@@ -309,25 +305,12 @@ const App = () => {
 
     // Validar campos individuales
     const validateAndUpdateError = (value, fieldName, errorKey, label) => {
-        // validateNumberInput ahora devuelve directamente la cadena de error para campos individuales
-        const errorStringOrObject = validateNumberInput(value, label, currentErrors[errorKey]);
+        // validateNumberInput ahora SIEMPRE devuelve un objeto { isValid, newErrors }
+        const { isValid: fieldIsValid, newErrors } = validateNumberInput(value, label, currentErrors[errorKey]);
         
-        // Si es un objeto (para arrays u objetos de errores), extraemos la propiedad newErrors
-        // Si es una cadena, la usamos directamente
-        let errorToAssign;
-        let isValidField;
-
-        if (typeof errorStringOrObject === 'object' && errorStringOrObject !== null && 'newErrors' in errorStringOrObject) {
-            errorToAssign = errorStringOrObject.newErrors;
-            isValidField = errorStringOrObject.isValid;
-        } else {
-            errorToAssign = errorStringOrObject; // Es una cadena de error
-            isValidField = errorStringOrObject === ''; // Es válido si la cadena está vacía
-        }
-
-        currentErrors[errorKey] = errorToAssign; // Asigna la cadena de error o el objeto de errores
-        if (!isValidField) hasErrors = true; // Si no es válido, hay errores
-        return isValidField; // Retorna true si es válido
+        currentErrors[errorKey] = newErrors; // Asigna la cadena de error (o array/objeto para otros campos)
+        if (!fieldIsValid) hasErrors = true; // Si no es válido, hay errores
+        return fieldIsValid; // Retorna true si es válido
     };
 
     validateAndUpdateError(formData.passengers, 'Total Passengers', 'passengers', 'Total Passengers');
@@ -337,7 +320,6 @@ const App = () => {
     // Validar cantidades de opciones generales
     const newOptionQuantitiesErrors = [...currentErrors.optionQuantities];
     formData.optionQuantities.forEach((qty, index) => {
-        // Para arrays, validateNumberInput aún devuelve un objeto { isValid, newErrors }
         const { isValid: fieldIsValid, newErrors } = validateNumberInput(qty, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, currentErrors.optionQuantities, index);
         if (!fieldIsValid) {
             newOptionQuantitiesErrors[index] = newErrors[index];
@@ -351,7 +333,6 @@ const App = () => {
     // Validar comidas especiales por carro
     const newSpecialMealsPerCartErrors = { ...currentErrors.specialMealsPerCart };
     for (const cartNum in formData.specialMealsPerCartInput) {
-        // Para objetos, validateNumberInput aún devuelve un objeto { isValid, newErrors }
         const { isValid: fieldIsValid, newErrors } = validateNumberInput(formData.specialMealsPerCartInput[cartNum], `Cart ${cartNum} Special Meals`, currentErrors.specialMealsPerCart, null);
         if (!fieldIsValid) {
             newSpecialMealsPerCartErrors[cartNum] = newErrors[cartNum];
@@ -688,7 +669,7 @@ const App = () => {
 
 
             {/* Copy Results Button */}
-            <div className="flex justify-center mt-6">
+            <div className="flex justify-center space-x-4 mt-6">
               <button
                 onClick={handleCopyResults}
                 className="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 transition duration-200 ease-in-out"
