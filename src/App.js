@@ -45,6 +45,15 @@ const InputField = ({ label, value, onChange, type = 'text', placeholder = '', e
   );
 };
 
+// Helper para obtener la clave de opción (ej. 'option1', 'option2') de un nombre de tipo de comida
+// MOVIMIENTO: Esta función se ha movido fuera del componente App para que su referencia sea estable.
+const getOptionKey = (mealType, optionNames) => { 
+  if (mealType === optionNames[0]) return 'option1';
+  if (mealType === optionNames[1]) return 'option2';
+  if (optionNames.length === 3 && mealType === optionNames[2]) return 'option3';
+  return null;
+};
+
 // Main App component
 const App = () => {
   // --- ESTADOS DEL FORMULARIO Y VALIDACIÓN ---
@@ -405,15 +414,6 @@ const App = () => {
 
   }, [formData, formErrors, _calculateAuxiliaryValues, _distributeMealsPerCart, _calculateExcesses, showMessage]);
 
-  // Helper para obtener la clave de opción (ej. 'option1', 'option2') de un nombre de tipo de comida
-  // Se ha eliminado useCallback ya que es una función pura que solo depende de sus argumentos.
-  const getOptionKey = (mealType, optionNames) => { 
-    if (mealType === optionNames[0]) return 'option1';
-    if (mealType === optionNames[1]) return 'option2';
-    if (optionNames.length === 3 && mealType === optionNames[2]) return 'option3';
-    return null;
-  };
-
   // --- NUEVA FUNCIÓN PARA REDISTRIBUIR EXCEDENTES DE COMIDAS GENERALES ---
   const redistributeExcessMeals = useCallback(() => {
     // Crear copias profundas para evitar mutar el estado original directamente
@@ -427,13 +427,14 @@ const App = () => {
     generalExcessesToDistribute.forEach(excessMeal => {
       let remainingExcess = N(excessMeal.quantity);
       const mealType = excessMeal.type;
-      const optionKey = getOptionKey(mealType, formData.optionNames);
+      // getOptionKey ahora es una función global, no necesita ser pasada como dependencia
+      const optionKey = getOptionKey(mealType, formData.optionNames); 
 
       if (!optionKey) return; // Si no se encuentra la clave de opción, se salta (no debería pasar para opciones válidas)
 
       // Estrategia de distribución: intentar igualar cantidades y luego llenar espacios restantes
       let attempts = 0;
-      // Added formData.numCarts to dependencies for maxAttemptsPerMealType calculation
+      // MAX_CART_CAPACITY es una constante global, no es necesario en las dependencias.
       const maxAttemptsPerMealType = MAX_CART_CAPACITY * N(formData.numCarts) * 3; // Límite para evitar bucles infinitos
 
       while (remainingExcess > 0 && attempts < maxAttemptsPerMealType) {
@@ -504,7 +505,7 @@ const App = () => {
     setExcessResults(newExcessResults); // Actualizar los excedentes restantes
     showMessage('success', 'Excess general meals redistributed!');
 
-  }, [distributionResults, excessResults, formData.optionNames, getOptionKey, showMessage, formData.numCarts]); // formData.numCarts added here
+  }, [distributionResults, excessResults, formData.optionNames, showMessage, formData.numCarts]); // getOptionKey removed from dependencies, formData.numCarts added
 
 
   // Función para copiar los resultados al portapapeles
