@@ -28,7 +28,7 @@ const InputField = ({ label, value, onChange, type = 'text', placeholder = '', e
   };
 
   return (
-    <div>
+    <div className="mb-4"> {/* Added margin-bottom for spacing */}
       <label className="block text-gray-700 text-sm font-bold mb-2">
         {label}
       </label>
@@ -526,12 +526,12 @@ const App = () => {
         {/* Input Parameters Section */}
         <div className="mb-8 p-6 bg-red-50 rounded-lg">
           <h2 className="text-xl font-semibold text-red-800 mb-4">🔧 Input Parameters</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 mb-6"> {/* Increased gap-x and gap-y */}
             <InputField label="Total Passengers" value={formData.passengers} onChange={(val) => handleInputChange('passengers', val)} type="number" placeholder="Ex: 133" error={formErrors.passengers} />
             <InputField label="Total Special Meals" value={formData.totalSpecialMeals} onChange={(val) => handleInputChange('totalSpecialMeals', val)} type="number" placeholder="Ex: 8" error={formErrors.totalSpecialMeals || formErrors.specialMealsTotalVsCartSum || formErrors.specialMealsVsPassengers} />
             <InputField label="Number of Carts" value={formData.numCarts} onChange={(val) => handleInputChange('numCarts', val)} type="number" placeholder="Ex: 6" error={formErrors.numCarts} />
             
-            <div>
+            <div className="mb-4"> {/* Added margin-bottom for spacing */}
               <label className="block text-gray-700 text-sm font-bold mb-2">Number of General Options</label>
               <select
                 className="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:ring-2 focus:ring-red-500"
@@ -548,7 +548,7 @@ const App = () => {
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-red-800 mb-3">General Meal Options</h3>
             {[...Array(N(formData.numGeneralOptions))].map((_, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3 p-3 bg-white rounded-lg shadow-sm border border-gray-200">
+              <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-3 p-3 bg-white rounded-lg shadow-sm border border-gray-200"> {/* Increased gap-x and gap-y */}
                 <InputField
                   label={`Option Name ${index + 1}`}
                   value={formData.optionNames[index] || ''}
@@ -572,7 +572,7 @@ const App = () => {
           {N(formData.numCarts) > 0 && (
             <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
               <h3 className="text-lg font-semibold text-red-800 mb-3">Special Meals Per Cart (Manual)</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4"> {/* Increased gap-x and gap-y */}
                 {[...Array(N(formData.numCarts))].map((_, index) => (
                   <InputField
                     key={index}
@@ -650,7 +650,7 @@ const App = () => {
 
             {/* Excesses Table */}
             <h3 className="text-lg font-semibold text-red-800 mt-6 mb-3">📥 Meals to Distribute Manually (Excesses)</h3>
-            <div className="overflow-x-auto rounded-lg shadow-md">
+            <div className="overflow-x-auto rounded-lg shadow-md mb-4"> {/* Added mb-4 for spacing before notes */}
               <table className="min-w-full bg-white border border-gray-200">
                 <thead className="bg-gray-100">
                   <tr>
@@ -674,6 +674,18 @@ const App = () => {
                 <span className="font-semibold">Note:</span> Negative values in "Quantity to Distribute" indicate a meal deficit.
               </p>
             </div>
+
+            {/* New Section: Final Notes on Excesses */}
+            <div className="p-4 bg-yellow-100 rounded-lg border border-yellow-300 text-yellow-800 mt-6">
+                <h3 className="text-lg font-semibold mb-2">Notas sobre el Exceso de Comidas:</h3>
+                <p className="text-sm">
+                    El exceso de comidas indicado arriba debería ser distribuido entre los diferentes carros **si su capacidad individual (máximo {MAX_CART_CAPACITY} unidades) aún lo permite**.
+                </p>
+                <p className="text-sm mt-2">
+                    Si los carros ya han alcanzado su capacidad máxima o no hay espacio suficiente, estas comidas deberán ser gestionadas **manualmente** o asignadas a un **carro auxiliar** si la operación lo requiere.
+                </p>
+            </div>
+
 
             {/* Copy Results Button */}
             <div className="flex justify-center mt-6">
