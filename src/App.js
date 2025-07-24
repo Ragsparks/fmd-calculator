@@ -28,7 +28,7 @@ const InputField = ({ label, value, onChange, type = 'text', placeholder = '', e
   };
 
   return (
-    <div className="mb-4"> {/* Added margin-bottom for spacing */}
+    <div className="mb-4"> {/* Añadido margen inferior para espaciado */}
       <label className="block text-gray-700 text-sm font-bold mb-2">
         {label}
       </label>
@@ -40,7 +40,7 @@ const InputField = ({ label, value, onChange, type = 'text', placeholder = '', e
         placeholder={placeholder}
       />
       {/* Asegúrate de que 'error' siempre sea una cadena o null/undefined */}
-      {error && <p className="text-red-500 text-xs italic mt-1">{error}</p>}
+      {error && <p className="text-red-500 text-xs italic mt-1 font-semibold">{error}</p>} {/* Añadido font-semibold */}
     </div>
   );
 };
@@ -73,10 +73,12 @@ const App = () => {
   const [mealAlertState, setMealAlertState] = useState({ isProblem: false, message: '' });
   const [distributionResults, setDistributionResults] = useState([]);
   const [excessResults, setExcessResults] = useState([]);
+  const [adjustedDistributionResults, setAdjustedDistributionResults] = useState(null); // Nuevo estado para la distribución ajustada
 
   // --- ESTADOS DE UI/FEEDBACK ---
   const [messageBox, setMessageBox] = useState({ show: false, type: '', message: '' });
   const [copyMessage, setCopyMessage] = useState('');
+  const [showExcessNotes, setShowExcessNotes] = useState(false); // Estado para el desplegable de notas
 
   // Muestra un mensaje temporal en la caja de mensajes (Ahora envuelto en useCallback)
   const showMessage = useCallback((type, message) => {
@@ -90,12 +92,12 @@ const App = () => {
   }, []); // Dependencias vacías para que la función sea estable
 
   // --- LÓGICA DE VALIDACIÓN CENTRALIZADA ---
-  // validateNumberInput ahora SIEMPRE devuelve un objeto { isValid, newErrors }
-  const validateNumberInput = (value, fieldName, currentErrors, index = null) => {
+  // validateNumberInput ahora SIEMPRE devuelve una cadena de error.
+  const validateNumberInput = (value, fieldName) => { // Eliminados currentErrors e index de la firma
     const num = Number(value);
     let errorMsg = '';
     if (value === '') {
-      errorMsg = ''; // Allow empty initially, or set "required" error if needed
+      errorMsg = ''; // Permitir vacío inicialmente, o establecer error "requerido" si es necesario
     } else if (isNaN(num)) {
       errorMsg = `Please enter a valid number for ${fieldName}.`;
     } else if (num < 0) {
@@ -105,19 +107,7 @@ const App = () => {
     } else if (fieldName === 'Total Passengers' && num > MAX_PASSENGERS) { // Nueva validación para pasajeros
       errorMsg = `Total passengers cannot exceed ${MAX_PASSENGERS}.`;
     }
-
-    // Todos los caminos de retorno ahora devuelven un objeto { isValid, newErrors }
-    if (index !== null) { // Para arrays como optionQuantities
-      const newArrayErrors = [...currentErrors];
-      newArrayErrors[index] = errorMsg;
-      return { isValid: !errorMsg, newErrors: newArrayErrors }; // Devuelve un objeto
-    } else if (fieldName.startsWith('Cart ') && !isNaN(parseInt(fieldName.split(' ')[1]))) { // Para números de carro específicos como "Cart 1", "Cart 2"
-        const newObjectErrors = { ...currentErrors };
-        newObjectErrors[fieldName.split(' ')[1]] = errorMsg;
-        return { isValid: !errorMsg, newErrors: newObjectErrors }; // Devuelve un objeto
-    } else { // Para campos individuales: passengers, totalSpecialMeals, numCarts
-      return { isValid: !errorMsg, newErrors: errorMsg }; // Devuelve un objeto consistentemente
-    }
+    return errorMsg; // Siempre devuelve una cadena
   };
 
   // --- HANDLERS DE CAMBIOS DE INPUTS ---
@@ -125,20 +115,14 @@ const App = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Validación en tiempo real
     if (field === 'passengers') {
-      const { newErrors } = validateNumberInput(value, 'Total Passengers', formErrors.passengers); // Desestructura para obtener newErrors
-      setFormErrors(prev => ({ ...prev, passengers: newErrors }));
-      setFormErrors(prev => ({ ...prev, specialMealsVsPassengers: '' }));
-    }
-    if (field === 'totalSpecialMeals') {
-      const { newErrors } = validateNumberInput(value, 'Total Special Meals', formErrors.totalSpecialMeals); // Desestructura para obtener newErrors
-      setFormErrors(prev => ({ ...prev, totalSpecialMeals: newErrors }));
-      setFormErrors(prev => ({ ...prev, specialMealsVsPassengers: '' }));
-      setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
-    }
-    if (field === 'numCarts') {
-      const { newErrors } = validateNumberInput(value, 'Number of Carts', formErrors.numCarts); // Desestructura para obtener newErrors
-      setFormErrors(prev => ({ ...prev, numCarts: newErrors }));
-      setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
+      const errorMsg = validateNumberInput(value, 'Total Passengers');
+      setFormErrors(prev => ({ ...prev, passengers: errorMsg, specialMealsVsPassengers: '' }));
+    } else if (field === 'totalSpecialMeals') {
+      const errorMsg = validateNumberInput(value, 'Total Special Meals');
+      setFormErrors(prev => ({ ...prev, totalSpecialMeals: errorMsg, specialMealsVsPassengers: '', specialMealsTotalVsCartSum: '' }));
+    } else if (field === 'numCarts') {
+      const errorMsg = validateNumberInput(value, 'Number of Carts');
+      setFormErrors(prev => ({ ...prev, numCarts: errorMsg, specialMealsTotalVsCartSum: '' }));
     }
   };
 
@@ -149,8 +133,14 @@ const App = () => {
   };
 
   const handleOptionQuantityChange = (index, value) => {
-    const { newErrors } = validateNumberInput(value, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, formErrors.optionQuantities, index);
-    setFormErrors(prev => ({ ...prev, optionQuantities: newErrors }));
+    const newQuantities = [...formData.optionQuantities];
+    newQuantities[index] = value;
+    setFormData(prev => ({ ...prev, optionQuantities: newQuantities }));
+
+    const errorMsg = validateNumberInput(value, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`);
+    const newOptionQuantitiesErrors = [...formErrors.optionQuantities];
+    newOptionQuantitiesErrors[index] = errorMsg;
+    setFormErrors(prev => ({ ...prev, optionQuantities: newOptionQuantitiesErrors }));
   };
 
   const handleSpecialMealsPerCartChange = (cartNumber, value) => {
@@ -162,8 +152,10 @@ const App = () => {
       }
     }));
 
-    const { newErrors } = validateNumberInput(value, `Cart ${cartNumber} Special Meals`, formErrors.specialMealsPerCart, null);
-    setFormErrors(prev => ({ ...prev, specialMealsPerCart: newErrors }));
+    const errorMsg = validateNumberInput(value, `Cart ${cartNumber} Special Meals`);
+    const newSpecialMealsPerCartErrors = { ...formErrors.specialMealsPerCart };
+    newSpecialMealsPerCartErrors[cartNumber] = errorMsg;
+    setFormErrors(prev => ({ ...prev, specialMealsPerCart: newSpecialMealsPerCartErrors }));
     // Limpiar el error de suma de especiales por carro
     setFormErrors(prev => ({ ...prev, specialMealsTotalVsCartSum: '' }));
   };
@@ -194,8 +186,10 @@ const App = () => {
     setMealAlertState({ isProblem: false, message: '' });
     setDistributionResults([]);
     setExcessResults([]);
+    setAdjustedDistributionResults(null); // Limpiar resultados ajustados
     hideMessage();
     setCopyMessage('');
+    setShowExcessNotes(false); // Ocultar notas al limpiar
   };
 
   // --- LÓGICA DE CÁLCULO REFACTORIZADA ---
@@ -214,7 +208,7 @@ const App = () => {
       percentOption2: totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[1]) / totalGeneralMealsAvailable,
       percentOption3: N(params.numGeneralOptions) === 3 ? (totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[2]) / totalGeneralMealsAvailable) : 0,
     };
-  }, []);
+  }, [formData.numCarts, formData.numGeneralOptions, formData.optionQuantities]); // Añadidas dependencias
 
   // Realiza la distribución de comidas por carro
   const _distributeMealsPerCart = useCallback((params, auxValues) => {
@@ -277,7 +271,7 @@ const App = () => {
       assigned.option3.push(option3Assigned);
     }
     return { results, assigned };
-  }, []);
+  }, [formData.numCarts, formData.numGeneralOptions, formData.specialMealsPerCartInput, MAX_CART_CAPACITY]); // Añadidas dependencias
 
   // Calcula los excedentes
   const _calculateExcesses = useCallback((params, assignedMeals, optionNames) => {
@@ -295,7 +289,7 @@ const App = () => {
       results.push({ type: optionNames[2], quantity: N(params.optionQuantities[2]) - sumAssignedOption3 });
     }
     return results;
-  }, []);
+  }, [formData.numGeneralOptions, formData.optionQuantities, formData.totalSpecialMeals]); // Añadidas dependencias
 
   // --- FUNCIÓN PRINCIPAL DE CÁLCULO ---
   const calculateDistribution = useCallback(() => {
@@ -305,12 +299,10 @@ const App = () => {
 
     // Validar campos individuales
     const validateAndUpdateError = (value, fieldName, errorKey, label) => {
-        // validateNumberInput ahora SIEMPRE devuelve un objeto { isValid, newErrors }
-        const { isValid: fieldIsValid, newErrors } = validateNumberInput(value, label, currentErrors[errorKey]);
-        
-        currentErrors[errorKey] = newErrors; // Asigna la cadena de error (o array/objeto para otros campos)
-        if (!fieldIsValid) hasErrors = true; // Si no es válido, hay errores
-        return fieldIsValid; // Retorna true si es válido
+        const errorString = validateNumberInput(value, label); // validateNumberInput ahora siempre devuelve una cadena
+        currentErrors[errorKey] = errorString; // Asigna la cadena directamente
+        if (errorString !== '') hasErrors = true; // Si hay una cadena de error, establece hasErrors
+        return errorString === ''; // Devuelve true si es válido (la cadena de error está vacía)
     };
 
     validateAndUpdateError(formData.passengers, 'Total Passengers', 'passengers', 'Total Passengers');
@@ -320,9 +312,9 @@ const App = () => {
     // Validar cantidades de opciones generales
     const newOptionQuantitiesErrors = [...currentErrors.optionQuantities];
     formData.optionQuantities.forEach((qty, index) => {
-        const { isValid: fieldIsValid, newErrors } = validateNumberInput(qty, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`, currentErrors.optionQuantities, index);
-        if (!fieldIsValid) {
-            newOptionQuantitiesErrors[index] = newErrors[index];
+        const errorMsg = validateNumberInput(qty, `${formData.optionNames[index] || `Option ${index + 1}`} Quantity`);
+        if (errorMsg !== '') {
+            newOptionQuantitiesErrors[index] = errorMsg;
             hasErrors = true;
         } else {
             newOptionQuantitiesErrors[index] = '';
@@ -333,9 +325,9 @@ const App = () => {
     // Validar comidas especiales por carro
     const newSpecialMealsPerCartErrors = { ...currentErrors.specialMealsPerCart };
     for (const cartNum in formData.specialMealsPerCartInput) {
-        const { isValid: fieldIsValid, newErrors } = validateNumberInput(formData.specialMealsPerCartInput[cartNum], `Cart ${cartNum} Special Meals`, currentErrors.specialMealsPerCart, null);
-        if (!fieldIsValid) {
-            newSpecialMealsPerCartErrors[cartNum] = newErrors[cartNum];
+        const errorMsg = validateNumberInput(formData.specialMealsPerCartInput[cartNum], `Cart ${cartNum} Special Meals`);
+        if (errorMsg !== '') {
+            newSpecialMealsPerCartErrors[cartNum] = errorMsg;
             hasErrors = true;
         } else {
             newSpecialMealsPerCartErrors[cartNum] = '';
@@ -377,13 +369,14 @@ const App = () => {
 
     setDistributionResults(distResults);
     setExcessResults(excResults);
+    setAdjustedDistributionResults(null); // Reiniciar resultados ajustados en un nuevo cálculo primario
 
     // Actualizar el estado de la alerta de comidas
     const totalAvailableMeals = auxValues.totalGeneralMealsAvailable + N(formData.totalSpecialMeals);
     if (totalAvailableMeals < N(formData.passengers)) {
       const mealsNeeded = N(formData.passengers);
       const mealsMissing = mealsNeeded - totalAvailableMeals;
-      const coveragePercentage = (mealsNeeded > 0) ? (totalAvailableMeals / mealsNeeded) * 100 : 0; // Avoid division by zero
+      const coveragePercentage = (mealsNeeded > 0) ? (totalAvailableMeals / mealsNeeded) * 100 : 0; // Evitar división por cero
       setMealAlertState({
         isProblem: true,
         message: (
@@ -405,6 +398,107 @@ const App = () => {
 
   }, [formData, formErrors, _calculateAuxiliaryValues, _distributeMealsPerCart, _calculateExcesses, showMessage]);
 
+  // Helper para obtener la clave de opción (ej. 'option1', 'option2') de un nombre de tipo de comida
+  // Se ha eliminado useCallback ya que es una función pura que solo depende de sus argumentos.
+  const getOptionKey = (mealType, optionNames) => { 
+    if (mealType === optionNames[0]) return 'option1';
+    if (mealType === optionNames[1]) return 'option2';
+    if (optionNames.length === 3 && mealType === optionNames[2]) return 'option3';
+    return null;
+  };
+
+  // --- NUEVA FUNCIÓN PARA REDISTRIBUIR EXCEDENTES DE COMIDAS GENERALES ---
+  const redistributeExcessMeals = useCallback(() => {
+    // Crear copias profundas para evitar mutar el estado original directamente
+    const newDistributionResults = JSON.parse(JSON.stringify(distributionResults));
+    const newExcessResults = JSON.parse(JSON.stringify(excessResults));
+
+    // Filtrar solo los excedentes de comidas generales (no especiales) con cantidad > 0
+    let generalExcessesToDistribute = newExcessResults.filter(e => e.type !== 'Specials' && N(e.quantity) > 0);
+
+    // Iterar sobre cada tipo de comida general con excedente
+    generalExcessesToDistribute.forEach(excessMeal => {
+      let remainingExcess = N(excessMeal.quantity);
+      const mealType = excessMeal.type;
+      const optionKey = getOptionKey(mealType, formData.optionNames);
+
+      if (!optionKey) return; // Si no se encuentra la clave de opción, se salta (no debería pasar para opciones válidas)
+
+      // Estrategia de distribución: intentar igualar cantidades y luego llenar espacios restantes
+      let attempts = 0;
+      const maxAttemptsPerMealType = MAX_CART_CAPACITY * N(formData.numCarts) * 3; // Límite para evitar bucles infinitos
+
+      while (remainingExcess > 0 && attempts < maxAttemptsPerMealType) {
+        attempts++;
+        let madeProgressInRound = false;
+
+        // Fase 1: Intentar igualar las cantidades de esta opción en los carros que tienen menos
+        // Encontrar la cantidad mínima de esta opción en carros con espacio disponible
+        let minOptionQtyInCartsWithSpace = Infinity;
+        newDistributionResults.forEach(cart => {
+          const availableSpaceInCart = MAX_CART_CAPACITY - cart.total;
+          if (availableSpaceInCart > 0) {
+            minOptionQtyInCartsWithSpace = Math.min(minOptionQtyInCartsWithSpace, cart[optionKey]);
+          }
+        });
+
+        // Distribuir a los carros que tienen la cantidad mínima (y espacio)
+        if (minOptionQtyInCartsWithSpace !== Infinity) {
+          for (let i = 0; i < newDistributionResults.length; i++) {
+            const cart = newDistributionResults[i];
+            const availableSpaceInCart = MAX_CART_CAPACITY - cart.total;
+            // Si el carro tiene la cantidad mínima de esta opción, tiene espacio y hay excedente
+            if (remainingExcess > 0 && availableSpaceInCart > 0 && cart[optionKey] === minOptionQtyInCartsWithSpace) {
+              cart[optionKey]++;
+              cart.total++;
+              remainingExcess--;
+              madeProgressInRound = true;
+            }
+          }
+        }
+
+        // Fase 2: Si no se hizo progreso igualando o si ya no hay mínimos claros,
+        // distribuir en un "round-robin" a cualquier carro con espacio
+        if (!madeProgressInRound && remainingExcess > 0) {
+            let distributedInThisSubRound = false;
+            for (let i = 0; i < newDistributionResults.length; i++) {
+                const cart = newDistributionResults[i];
+                const availableSpaceInCart = MAX_CART_CAPACITY - cart.total;
+                if (remainingExcess > 0 && availableSpaceInCart > 0) {
+                    cart[optionKey]++;
+                    cart.total++;
+                    remainingExcess--;
+                    distributedInThisSubRound = true;
+                    madeProgressInRound = true; // Se hizo progreso
+                }
+            }
+            if (!distributedInThisSubRound && remainingExcess > 0) {
+                // Si no se pudo distribuir nada en este sub-round, no hay más espacio disponible
+                break;
+            }
+        }
+
+        if (!madeProgressInRound && remainingExcess > 0) {
+            // Si no se hizo ningún progreso en esta ronda completa, salimos para evitar bucle infinito
+            break;
+        }
+      }
+
+      // Actualizar la cantidad de excedente para este tipo de comida
+      const excessIndex = newExcessResults.findIndex(e => e.type === mealType);
+      if (excessIndex !== -1) {
+        newExcessResults[excessIndex].quantity = remainingExcess;
+      }
+    });
+
+    // Actualizar el estado con los nuevos resultados
+    setAdjustedDistributionResults(newDistributionResults);
+    setExcessResults(newExcessResults); // Actualizar los excedentes restantes
+    showMessage('success', 'Excess general meals redistributed!');
+
+  }, [distributionResults, excessResults, formData.optionNames, getOptionKey, showMessage]);
+
+
   // Función para copiar los resultados al portapapeles
   const handleCopyResults = () => {
     let copyText = "--- Flight Meal Distribution Results ---\n\n";
@@ -417,7 +511,7 @@ const App = () => {
         : mealAlertState.message.props.children.map(child => {
             if (typeof child === 'string') return child;
             if (child && child.props && child.props.children) {
-                // Handle cases where children might be an array or single item
+                // Manejar casos en los que los hijos pueden ser un array o un solo elemento
                 if (Array.isArray(child.props.children)) {
                     return child.props.children.join('');
                 }
@@ -425,12 +519,15 @@ const App = () => {
             }
             return '';
         }).join('');
-      copyText += `Meal Alert: ${alertMessageContent.replace(/\s+/g, ' ').trim()}\n\n`; // Clean up extra spaces
+      copyText += `Meal Alert: ${alertMessageContent.replace(/\s+/g, ' ').trim()}\n\n`; // Limpiar espacios extra
     }
 
-    // Añadir Distribución por Carro
-    if (distributionResults.length > 0) {
-      copyText += "Distribution by Cart:\n";
+    // Añadir Distribución por Carro (Inicial o Ajustada)
+    const resultsToCopy = adjustedDistributionResults || distributionResults;
+    const sectionTitle = adjustedDistributionResults ? "Adjusted Distribution by Cart:" : "Initial Distribution by Cart:";
+
+    if (resultsToCopy.length > 0) {
+      copyText += sectionTitle + "\n";
       const headers = ["Cart No.", "Specials", formData.optionNames[0] || 'Option 1', formData.optionNames[1] || 'Option 2'];
       if (N(formData.numGeneralOptions) === 3) {
         headers.push(formData.optionNames[2] || 'Option 3');
@@ -438,7 +535,7 @@ const App = () => {
       headers.push("Total Meals");
       copyText += headers.join("\t") + "\n"; // Separado por tabulaciones
 
-      distributionResults.forEach(row => {
+      resultsToCopy.forEach(row => {
         let rowData = [
           row.cartName,
           row.special,
@@ -456,7 +553,7 @@ const App = () => {
 
     // Añadir Excedentes
     if (excessResults.length > 0) {
-      copyText += "Meals to Distribute Manually (Excesses):\n";
+      copyText += "Meals to Distribute Manually (Remaining Excesses):\n"; // Título cambiado
       copyText += "Meal Type\tQuantity to Distribute\n";
       excessResults.forEach(row => {
         if (row.quantity !== 0 && row.quantity !== "") {
@@ -465,6 +562,14 @@ const App = () => {
       });
       copyText += "\n";
     }
+
+    // Añadir Notas sobre el Exceso de Comidas (si están visibles o no)
+    if (showExcessNotes) { // Solo copiar si las notas están actualmente visibles
+        copyText += "--- Notes on Excess Meals ---\n";
+        copyText += `The excess meals indicated above should be distributed among the different carts if their individual capacity (maximum ${MAX_CART_CAPACITY} units) still allows it.\n`;
+        copyText += "If the carts have already reached their maximum capacity or there is not enough space, these meals must be managed manually or assigned to an auxiliary cart if the operation requires it.\n\n";
+    }
+
 
     // Copiar al portapapeles
     const textarea = document.createElement('textarea');
@@ -496,7 +601,7 @@ const App = () => {
 
         {/* Custom Message Box (for critical errors) */}
         {messageBox.show && (
-          <div className="fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white z-50 bg-red-500">
+          <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white z-50 ${messageBox.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}> {/* Color dinámico aquí */}
             <p className="font-semibold">{messageBox.message}</p>
             <button onClick={hideMessage} className="ml-4 px-2 py-1 bg-white bg-opacity-20 rounded-md hover:bg-opacity-30 transition">
               X
@@ -507,12 +612,12 @@ const App = () => {
         {/* Input Parameters Section */}
         <div className="mb-8 p-6 bg-red-50 rounded-lg">
           <h2 className="text-xl font-semibold text-red-800 mb-4">🔧 Input Parameters</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 mb-6"> {/* Increased gap-x and gap-y */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 mb-6"> {/* Espaciado aumentado en X e Y */}
             <InputField label="Total Passengers" value={formData.passengers} onChange={(val) => handleInputChange('passengers', val)} type="number" placeholder="Ex: 133" error={formErrors.passengers} />
             <InputField label="Total Special Meals" value={formData.totalSpecialMeals} onChange={(val) => handleInputChange('totalSpecialMeals', val)} type="number" placeholder="Ex: 8" error={formErrors.totalSpecialMeals || formErrors.specialMealsTotalVsCartSum || formErrors.specialMealsVsPassengers} />
             <InputField label="Number of Carts" value={formData.numCarts} onChange={(val) => handleInputChange('numCarts', val)} type="number" placeholder="Ex: 6" error={formErrors.numCarts} />
             
-            <div className="mb-4"> {/* Added margin-bottom for spacing */}
+            <div className="mb-4"> {/* Añadido margen inferior para espaciado */}
               <label className="block text-gray-700 text-sm font-bold mb-2">Number of General Options</label>
               <select
                 className="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:ring-2 focus:ring-red-500"
@@ -529,7 +634,7 @@ const App = () => {
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-red-800 mb-3">General Meal Options</h3>
             {[...Array(N(formData.numGeneralOptions))].map((_, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-3 p-3 bg-white rounded-lg shadow-sm border border-gray-200"> {/* Increased gap-x and gap-y */}
+              <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-3 p-3 bg-white rounded-lg shadow-sm border border-gray-200"> {/* Espaciado aumentado en X e Y */}
                 <InputField
                   label={`Option Name ${index + 1}`}
                   value={formData.optionNames[index] || ''}
@@ -553,7 +658,7 @@ const App = () => {
           {N(formData.numCarts) > 0 && (
             <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
               <h3 className="text-lg font-semibold text-red-800 mb-3">Special Meals Per Cart (Manual)</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4"> {/* Increased gap-x and gap-y */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4"> {/* Espaciado aumentado en X e Y */}
                 {[...Array(N(formData.numCarts))].map((_, index) => (
                   <InputField
                     key={index}
@@ -587,7 +692,7 @@ const App = () => {
         </div>
 
         {/* Output Section */}
-        {distributionResults.length > 0 || mealAlertState.message ? ( // Show output section if results exist or alert is present
+        {distributionResults.length > 0 || mealAlertState.message ? ( // Mostrar sección de salida si existen resultados o hay alerta
           <div className="mt-8 p-6 bg-red-50 rounded-lg shadow-inner">
             <h2 className="text-xl font-semibold text-red-800 mb-4">📊 Distribution Results</h2>
 
@@ -596,9 +701,9 @@ const App = () => {
               {mealAlertState.message}
             </div>
 
-            {/* Distribution by Car Table */}
-            <h3 className="text-lg font-semibold text-red-800 mb-3">📤 Distribution by Cart</h3>
-            <div className="overflow-x-auto rounded-lg shadow-md">
+            {/* Initial Distribution by Car Table */}
+            <h3 className="text-lg font-semibold text-red-800 mb-3">📤 Initial Distribution by Cart</h3>
+            <div className="overflow-x-auto rounded-lg shadow-md mb-6">
               <table className="min-w-full bg-white border border-gray-200">
                 <thead className="bg-gray-100">
                   <tr>
@@ -631,7 +736,7 @@ const App = () => {
 
             {/* Excesses Table */}
             <h3 className="text-lg font-semibold text-red-800 mt-6 mb-3">📥 Meals to Distribute Manually (Excesses)</h3>
-            <div className="overflow-x-auto rounded-lg shadow-md mb-4"> {/* Added mb-4 for spacing before notes */}
+            <div className="overflow-x-auto rounded-lg shadow-md mb-4">
               <table className="min-w-full bg-white border border-gray-200">
                 <thead className="bg-gray-100">
                   <tr>
@@ -641,11 +746,11 @@ const App = () => {
                 </thead>
                 <tbody>
                   {excessResults.map((row, index) => (
-                    // Only display if quantity is not 0 or empty
+                    // Solo mostrar si la cantidad no es 0 o vacía
                     (row.quantity !== 0 && row.quantity !== "") && (
                       <tr key={index} className={row.quantity < 0 ? 'bg-red-100' : 'bg-yellow-100'}>
                         <td className="py-2 px-4 border-b text-sm text-gray-800">{row.type}</td>
-                        <td className="py-2 px-4 border-b text-sm text-gray-800 font-semibold">{row.quantity}</td>
+                        <td className="py-2 px-4 border-b text-sm text-gray-800">{row.quantity}</td>
                       </tr>
                     )
                   ))}
@@ -656,15 +761,75 @@ const App = () => {
               </p>
             </div>
 
-            {/* New Section: Final Notes on Excesses */}
-            <div className="p-4 bg-yellow-100 rounded-lg border border-yellow-300 text-yellow-800 mt-6">
-                <h3 className="text-lg font-semibold mb-2">Notas sobre el Exceso de Comidas:</h3>
-                <p className="text-sm">
-                    El exceso de comidas indicado arriba debería ser distribuido entre los diferentes carros **si su capacidad individual (máximo {MAX_CART_CAPACITY} unidades) aún lo permite**.
-                </p>
-                <p className="text-sm mt-2">
-                    Si los carros ya han alcanzado su capacidad máxima o no hay espacio suficiente, estas comidas deberán ser gestionadas **manualmente** o asignadas a un **carro auxiliar** si la operación lo requiere.
-                </p>
+            {/* Button to trigger excess redistribution, only if there are general excesses */}
+            {excessResults.some(e => e.type !== 'Specials' && N(e.quantity) > 0) && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={redistributeExcessMeals}
+                  className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition duration-200 ease-in-out"
+                >
+                  Redistribute Excess General Meals
+                </button>
+              </div>
+            )}
+
+            {/* Adjusted Distribution Table (conditionally rendered) */}
+            {adjustedDistributionResults && (
+              <div className="mt-8 p-6 bg-blue-50 rounded-lg shadow-inner border border-blue-200">
+                <h3 className="text-xl font-semibold text-blue-800 mb-4">✨ Adjusted Distribution by Cart</h3>
+                <div className="overflow-x-auto rounded-lg shadow-md">
+                  <table className="min-w-full bg-white border border-gray-200">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-700">Cart No.</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-700">Specials</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-700">{formData.optionNames[0] || 'Option 1'}</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-700">{formData.optionNames[1] || 'Option 2'}</th>
+                        {N(formData.numGeneralOptions) === 3 && (
+                          <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-700">{formData.optionNames[2] || 'Option 3'}</th>
+                        )}
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-700">Total Meals</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adjustedDistributionResults.map((row, index) => (
+                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{row.cartName}</td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{row.special}</td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{row.option1}</td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{row.option2}</td>
+                          {N(formData.numGeneralOptions) === 3 && (
+                            <td className="py-2 px-4 border-b text-sm text-gray-800">{row.option3}</td>
+                          )}
+                          <td className="py-2 px-4 border-b text-sm text-gray-800 font-semibold">{row.total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+
+            {/* New Section: Final Notes on Excesses (Collapsible) */}
+            <div className="mt-6">
+                <button
+                    onClick={() => setShowExcessNotes(!showExcessNotes)}
+                    className="w-full px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition duration-200 ease-in-out flex items-center justify-center"
+                >
+                    {showExcessNotes ? 'Hide Notes on Excess Meals ▲' : 'Show Notes on Excess Meals ▼'}
+                </button>
+                {showExcessNotes && (
+                    <div className="p-4 bg-yellow-100 rounded-lg border border-yellow-300 text-yellow-800 mt-4 transition-all duration-300 ease-in-out">
+                        <h3 className="text-lg font-semibold mb-2">Notes on Excess Meals:</h3> {/* Título traducido */}
+                        <p className="text-sm">
+                            The excess meals indicated above should be distributed among the different carts **if their individual capacity (maximum {MAX_CART_CAPACITY} units) still allows it**.
+                        </p>
+                        <p className="text-sm mt-2">
+                            If the carts have already reached their maximum capacity or there is not enough space, these meals must be managed **manually** or assigned to an **auxiliary cart** if the operation requires it.
+                        </p>
+                    </div>
+                )}
             </div>
 
 
@@ -681,7 +846,7 @@ const App = () => {
               )}
             </div>
           </div>
-        ) : ( // Initial message when no results yet
+        ) : ( // Mensaje inicial cuando aún no hay resultados
           <div className="mt-8 p-6 bg-gray-200 rounded-lg text-center text-gray-700">
             <p className="text-lg font-semibold mb-2">Welcome to the Flight Meal Distribution Calculator!</p>
             <p>Enter your flight parameters above and click 'Calculate Distribution' to see the meal breakdown by cart and any excesses.</p>
