@@ -208,7 +208,7 @@ const App = () => {
       percentOption2: totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[1]) / totalGeneralMealsAvailable,
       percentOption3: N(params.numGeneralOptions) === 3 ? (totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[2]) / totalGeneralMealsAvailable) : 0,
     };
-  }, [formData.numCarts, formData.numGeneralOptions, formData.optionQuantities]); // Añadidas dependencias
+  }, [formData.numCarts, formData.numGeneralOptions, formData.optionQuantities]); // Mantenidas: estas son dependencias válidas del estado formData
 
   // Realiza la distribución de comidas por carro
   const _distributeMealsPerCart = useCallback((params, auxValues) => {
@@ -270,8 +270,8 @@ const App = () => {
       assigned.option2.push(option2Assigned);
       assigned.option3.push(option3Assigned);
     }
-    return { results, assigned };
-  }, [formData.numCarts, formData.numGeneralOptions, formData.specialMealsPerCartInput, MAX_CART_CAPACITY]); // Añadidas dependencias
+    // Eliminada MAX_CART_CAPACITY de las dependencias, ya que es una constante global
+  }, [formData.numCarts, formData.numGeneralOptions, formData.specialMealsPerCartInput]); 
 
   // Calcula los excedentes
   const _calculateExcesses = useCallback((params, assignedMeals, optionNames) => {
@@ -288,8 +288,8 @@ const App = () => {
     if (N(params.numGeneralOptions) === 3) {
       results.push({ type: optionNames[2], quantity: N(params.optionQuantities[2]) - sumAssignedOption3 });
     }
-    return results;
-  }, [formData.numGeneralOptions, formData.optionQuantities, formData.totalSpecialMeals]); // Añadidas dependencias
+    // Mantenidas: estas son dependencias válidas del estado formData
+  }, [formData.numGeneralOptions, formData.optionQuantities, formData.totalSpecialMeals]); 
 
   // --- FUNCIÓN PRINCIPAL DE CÁLCULO ---
   const calculateDistribution = useCallback(() => {
@@ -496,8 +496,7 @@ const App = () => {
     setExcessResults(newExcessResults); // Actualizar los excedentes restantes
     showMessage('success', 'Excess general meals redistributed!');
 
-  }, [distributionResults, excessResults, formData.optionNames, getOptionKey, showMessage]);
-
+  }, [distributionResults, excessResults, formData.optionNames, getOptionKey, showMessage, formData.numCarts]); // Añadida formData.numCarts
 
   // Función para copiar los resultados al portapapeles
   const handleCopyResults = () => {
