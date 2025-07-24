@@ -46,7 +46,7 @@ const InputField = ({ label, value, onChange, type = 'text', placeholder = '', e
 };
 
 // Helper para obtener la clave de opción (ej. 'option1', 'option2') de un nombre de tipo de comida
-// MOVIMIENTO: Esta función se ha movido fuera del componente App para que su referencia sea estable.
+// Esta función se ha movido fuera del componente App para que su referencia sea estable.
 const getOptionKey = (mealType, optionNames) => { 
   if (mealType === optionNames[0]) return 'option1';
   if (mealType === optionNames[1]) return 'option2';
@@ -205,35 +205,37 @@ const App = () => {
 
   // --- LÓGICA DE CÁLCULO REFACTORIZADA ---
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const _calculateAuxiliaryValues = useCallback((params) => {
-    const totalGeneralMealsAvailable = N(params.optionQuantities[0]) + N(params.optionQuantities[1]) + (N(params.numGeneralOptions) === 3 ? N(params.optionQuantities[2]) : 0);
-    const baseCapacityPerCart = N(params.numCarts) === 0 ? 0 : Math.floor(totalGeneralMealsAvailable / N(params.numCarts));
-    const cartsWithExtraMeal = totalGeneralMealsAvailable - (baseCapacityPerCart * N(params.numCarts));
+  // Calcula valores auxiliares como porcentajes y capacidades base
+  // Accede directamente a formData desde el ámbito del componente
+  const _calculateAuxiliaryValues = useCallback(() => {
+    const totalGeneralMealsAvailable = N(formData.optionQuantities[0]) + N(formData.optionQuantities[1]) + (N(formData.numGeneralOptions) === 3 ? N(formData.optionQuantities[2]) : 0);
+    const baseCapacityPerCart = N(formData.numCarts) === 0 ? 0 : Math.floor(totalGeneralMealsAvailable / N(formData.numCarts));
+    const cartsWithExtraMeal = totalGeneralMealsAvailable - (baseCapacityPerCart * N(formData.numCarts));
 
     return {
       totalGeneralMealsAvailable,
       baseCapacityPerCart,
       cartsWithExtraMeal,
-      percentOption1: totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[0]) / totalGeneralMealsAvailable,
-      percentOption2: totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[1]) / totalGeneralMealsAvailable,
-      percentOption3: N(params.numGeneralOptions) === 3 ? (totalGeneralMealsAvailable === 0 ? 0 : N(params.optionQuantities[2]) / totalGeneralMealsAvailable) : 0,
+      percentOption1: totalGeneralMealsAvailable === 0 ? 0 : N(formData.optionQuantities[0]) / totalGeneralMealsAvailable,
+      percentOption2: totalGeneralMealsAvailable === 0 ? 0 : N(formData.optionQuantities[1]) / totalGeneralMealsAvailable,
+      percentOption3: N(formData.numGeneralOptions) === 3 ? (totalGeneralMealsAvailable === 0 ? 0 : N(formData.optionQuantities[2]) / totalGeneralMealsAvailable) : 0,
     };
-  }, [formData.numCarts, formData.numGeneralOptions, formData.optionQuantities]); // Mantenidas: estas son dependencias válidas del estado formData
+  }, [formData.numCarts, formData.numGeneralOptions, formData.optionQuantities]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const _distributeMealsPerCart = useCallback((params, auxValues) => {
+  // Realiza la distribución de comidas por carro
+  // Accede directamente a formData desde el ámbito del componente
+  const _distributeMealsPerCart = useCallback((auxValues) => { // 'params' argument removed
     const results = [];
     const assigned = { special: [], option1: [], option2: [], option3: [] };
 
     // FIX: Add early return if no carts to prevent TypeError
-    if (N(params.numCarts) === 0) {
+    if (N(formData.numCarts) === 0) { // Using formData directly
       return { results, assigned }; // Return empty arrays to prevent destructuring undefined
     }
 
-    for (let i = 1; i <= N(params.numCarts); i++) {
+    for (let i = 1; i <= N(formData.numCarts); i++) { // Using formData directly
       const cartName = `Cart ${i}`;
-      const specialMealsForThisCart = N(params.specialMealsPerCartInput[i]);
+      const specialMealsForThisCart = N(formData.specialMealsPerCartInput[i]); // Using formData directly
 
       const generalCapacityForThisCart = Math.min(
         MAX_CART_CAPACITY,
@@ -250,7 +252,7 @@ const App = () => {
       let remainingSpaceAfterOpt2 = remainingSpaceAfterOpt1 - option2Assigned;
 
       let option3Assigned = 0;
-      if (N(params.numGeneralOptions) === 3) {
+      if (N(formData.numGeneralOptions) === 3) { // Using formData directly
         option3Assigned = Math.round(Math.min(remainingSpaceAfterOpt2, availableSpaceForGeneral * auxValues.percentOption3));
       }
 
@@ -287,25 +289,26 @@ const App = () => {
       assigned.option3.push(option3Assigned);
     }
     return { results, assigned };
-  }, [formData.numCarts, formData.numGeneralOptions, formData.specialMealsPerCartInput]); // MAX_CART_CAPACITY removed from dependencies
+  }, [formData.numCarts, formData.numGeneralOptions, formData.specialMealsPerCartInput]); // Dependencies adjusted
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const _calculateExcesses = useCallback((params, assignedMeals, optionNames) => {
+  // Calcula los excedentes
+  // Accede directamente a formData desde el ámbito del componente
+  const _calculateExcesses = useCallback((assignedMeals) => { // 'params' and 'optionNames' arguments removed
     const sumAssignedSpecial = assignedMeals.special.reduce((sum, qty) => sum + qty, 0);
     const sumAssignedOption1 = assignedMeals.option1.reduce((sum, qty) => sum + qty, 0);
     const sumAssignedOption2 = assignedMeals.option2.reduce((sum, qty) => sum + qty, 0);
     const sumAssignedOption3 = assignedMeals.option3.reduce((sum, qty) => sum + qty, 0);
 
     const results = [
-      { type: 'Specials', quantity: N(params.totalSpecialMeals) - sumAssignedSpecial },
-      { type: optionNames[0], quantity: N(params.optionQuantities[0]) - sumAssignedOption1 },
-      { type: optionNames[1], quantity: N(params.optionQuantities[1]) - sumAssignedOption2 },
+      { type: 'Specials', quantity: N(formData.totalSpecialMeals) - sumAssignedSpecial }, // Using formData directly
+      { type: formData.optionNames[0], quantity: N(formData.optionQuantities[0]) - sumAssignedOption1 }, // Using formData directly
+      { type: formData.optionNames[1], quantity: N(formData.optionQuantities[1]) - sumAssignedOption2 }, // Using formData directly
     ];
-    if (N(params.numGeneralOptions) === 3) {
-      results.push({ type: optionNames[2], quantity: N(params.optionQuantities[2]) - sumAssignedOption3 });
+    if (N(formData.numGeneralOptions) === 3) { // Using formData directly
+      results.push({ type: formData.optionNames[2], quantity: N(formData.optionQuantities[2]) - sumAssignedOption3 }); // Using formData directly
     }
     return results;
-  }, [formData.numGeneralOptions, formData.optionQuantities, formData.totalSpecialMeals]); // Mantenidas: estas son dependencias válidas del estado formData
+  }, [formData.numGeneralOptions, formData.optionQuantities, formData.totalSpecialMeals, formData.optionNames]); // Dependencies adjusted
 
   // --- FUNCIÓN PRINCIPAL DE CÁLCULO ---
   const calculateDistribution = useCallback(() => {
@@ -379,9 +382,9 @@ const App = () => {
     }
 
     // --- PROCEDER CON CÁLCULO SI NO HAY ERRORES ---
-    const auxValues = _calculateAuxiliaryValues(formData);
-    const { results: distResults, assigned: assignedMeals } = _distributeMealsPerCart(formData, auxValues);
-    const excResults = _calculateExcesses(formData, assignedMeals, formData.optionNames);
+    const auxValues = _calculateAuxiliaryValues(); // No longer passing formData
+    const { results: distResults, assigned: assignedMeals } = _distributeMealsPerCart(auxValues); // No longer passing formData
+    const excResults = _calculateExcesses(assignedMeals); // No longer passing formData.optionNames
 
     setDistributionResults(distResults);
     setExcessResults(excResults);
@@ -505,7 +508,7 @@ const App = () => {
     setExcessResults(newExcessResults); // Actualizar los excedentes restantes
     showMessage('success', 'Excess general meals redistributed!');
 
-  }, [distributionResults, excessResults, formData.optionNames, showMessage, formData.numCarts]); // getOptionKey removed from dependencies, formData.numCarts added
+  }, [distributionResults, excessResults, formData.optionNames, showMessage, formData.numCarts]); // formData.numCarts added here
 
 
   // Función para copiar los resultados al portapapeles
