@@ -111,11 +111,11 @@ const App = () => {
       const newArrayErrors = [...currentErrors];
       newArrayErrors[index] = errorMsg;
       return { isValid: !errorMsg, newErrors: newArrayErrors }; // Returns an object
-    } else if (fieldName.includes('Cart')) { // Para objetos como specialMealsPerCartInput
+    } else if (fieldName.startsWith('Cart ') && !isNaN(parseInt(fieldName.split(' ')[1]))) { // Para números de carro específicos como "Cart 1", "Cart 2"
         const newObjectErrors = { ...currentErrors };
         newObjectErrors[fieldName.split(' ')[1]] = errorMsg;
         return { isValid: !errorMsg, newErrors: newObjectErrors }; // Returns an object
-    } else { // Para campos individuales (passengers, totalSpecialMeals, numCarts)
+    } else { // Para campos individuales: passengers, totalSpecialMeals, numCarts
       return errorMsg; // Directly return the error string
     }
   };
@@ -310,10 +310,24 @@ const App = () => {
     // Validar campos individuales
     const validateAndUpdateError = (value, fieldName, errorKey, label) => {
         // validateNumberInput ahora devuelve directamente la cadena de error para campos individuales
-        const errorString = validateNumberInput(value, label, currentErrors[errorKey]);
-        currentErrors[errorKey] = errorString; // Asigna la cadena de error
-        if (errorString !== '') hasErrors = true; // Si hay una cadena de error, hay errores
-        return errorString === ''; // Retorna true si no hay error (es válido)
+        const errorStringOrObject = validateNumberInput(value, label, currentErrors[errorKey]);
+        
+        // Si es un objeto (para arrays u objetos de errores), extraemos la propiedad newErrors
+        // Si es una cadena, la usamos directamente
+        let errorToAssign;
+        let isValidField;
+
+        if (typeof errorStringOrObject === 'object' && errorStringOrObject !== null && 'newErrors' in errorStringOrObject) {
+            errorToAssign = errorStringOrObject.newErrors;
+            isValidField = errorStringOrObject.isValid;
+        } else {
+            errorToAssign = errorStringOrObject; // Es una cadena de error
+            isValidField = errorStringOrObject === ''; // Es válido si la cadena está vacía
+        }
+
+        currentErrors[errorKey] = errorToAssign; // Asigna la cadena de error o el objeto de errores
+        if (!isValidField) hasErrors = true; // Si no es válido, hay errores
+        return isValidField; // Retorna true si es válido
     };
 
     validateAndUpdateError(formData.passengers, 'Total Passengers', 'passengers', 'Total Passengers');
